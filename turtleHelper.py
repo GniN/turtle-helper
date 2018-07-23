@@ -13,7 +13,7 @@ from PTTLibrary import PTT
 from PTTLibrary import Big5uao
 from signalCode import SignalCode
 
-VERSION = 'v1.04'
+VERSION = 'v1.05'
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """

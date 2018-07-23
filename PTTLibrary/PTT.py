@@ -1127,7 +1127,9 @@ class Library(object):
                 
                 if not len(Temp.encode('big5')) < MaxPushLength:
                     break
-                elif PushContent.endswith(Temp):
+                elif PushContent == Temp:
+                    break
+                elif TempEndIndex > len(PushContent):
                     break
                     
                 TempEndIndex += 1
