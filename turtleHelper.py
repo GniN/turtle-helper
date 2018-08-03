@@ -166,7 +166,8 @@ class App(QMainWindow):
         self.widget.send_button.clicked.connect(self.sendMails)
         self.widget.preview_button.clicked.connect(self.previewMail)
         for i in range(len(self.widget.quickPushFormButtons)):
-            self.widget.quickPushFormButtons[i].clicked.connect(partial(self.push, i))
+            self.widget.quickPushFormButtons[i].clicked.connect(partial(self.push, i, False))
+            self.widget.quickPushFormControls[i].returnPressed.connect(partial(self.push, i, True))
         self.widget.edit_content_button.clicked.connect(self.edit_post)
         self.resize(600, 20)
 
@@ -179,10 +180,14 @@ class App(QMainWindow):
         else:
             self.statusBar().showMessage('失敗, 推文內容為空白')
 
-    def push(self, i):
+    def push(self, i, byEnter):
+        if byEnter and not self.widget.enablePushOnEnterCheckbox.isChecked():
+            return
         board = self.widget.board_input.text()
         post_index = int(self.widget.post_index_input.text())
         push_text = self.widget.quickPushFormControls[i].text()
+        if self.widget.clearTextAfterPushCheckbox.isChecked():
+            self.widget.quickPushFormControls[i].setText('')
         if len(push_text) > 0:
             self.widget.quickPushFormButtons[i].setEnabled(False)
             self._ptt.queue.put(Task('push', text = push_text, post_index=post_index, board=board))
@@ -366,6 +371,12 @@ class MainWidget(QWidget):
         self.quickPushFormControls = []
         self.quickPushFormButtons = []
 
+        self.enablePushOnEnterCheckbox = QCheckBox('是否啟用enter送出推文')
+        self.clearTextAfterPushCheckbox = QCheckBox('推文後是否清空文字框')
+
+        fast_push_grid.addWidget(self.enablePushOnEnterCheckbox, 0, 0)
+        fast_push_grid.addWidget(self.clearTextAfterPushCheckbox, 1, 0)
+
         for i in range(5):
             push_label = QLabel('快速推文' + str(i+1))
             push_input = QLineEdit()
@@ -375,9 +386,9 @@ class MainWidget(QWidget):
             self.quickPushFormButtons.append(push_button)
             form_layout.addRow(push_label, push_input)
             form_layout.addRow(push_button)
-            fast_push_grid.addWidget(push_label, i, 0)
-            fast_push_grid.addWidget(push_input, i, 1)
-            fast_push_grid.addWidget(push_button, i, 2)
+            fast_push_grid.addWidget(push_label, i + 2, 0)
+            fast_push_grid.addWidget(push_input, i + 2, 1)
+            fast_push_grid.addWidget(push_button, i + 2, 2)
         
         fase_push_group = QGroupBox('快速推文')
         fase_push_group.setLayout(fast_push_grid)
