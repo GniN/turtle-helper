@@ -13,7 +13,7 @@ from PTTLibrary import PTT
 from PTTLibrary import Big5uao
 from signalCode import SignalCode
 
-VERSION = 'v1.05'
+VERSION = 'v1.06'
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -120,7 +120,7 @@ class PTTThread(QThread):
         self.signal.emit(SignalCode.PushComplete)
  
 # pip install pyinstaller
-# pyinstaller pttHelper.spec
+# pyinstaller turtleHelper.spec
 class App(QMainWindow):
  
     def __init__(self):
@@ -143,6 +143,7 @@ class App(QMainWindow):
         self.setCentralWidget(self.central_widget)
 
         self.widget = Login(self)
+        self.widget.password_input.returnPressed.connect(self.login)
         self.widget.login_button.clicked.connect(self.login)
         self.central_widget.addWidget(self.widget)
         self.central_widget.setCurrentWidget(self.widget)
