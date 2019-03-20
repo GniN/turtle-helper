@@ -1,1 +1,4 @@
 PyQt5
+progressbar
+paramiko
+uao
