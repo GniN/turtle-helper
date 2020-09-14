@@ -13,7 +13,7 @@ from PTTLibrary import PTT
 from PTTLibrary import Big5uao
 from signalCode import SignalCode
 
-VERSION = 'v1.06'
+VERSION = 'v1.07'
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -108,16 +108,19 @@ class PTTThread(QThread):
     
     def push(self, board, post_index, content):
         self.msg.emit('準備推文')
-        self.pttErrCode = self.PTTBot.push(board, PTT.PushType.Push, content, PostIndex=post_index)
-        if self.pttErrCode == PTT.ErrorCode.Success:
-            self.msg.emit('推文成功')
-        elif self.pttErrCode == PTT.ErrorCode.ErrorInput:
-            self.msg.emit('使用文章編號: 參數錯誤')
-        elif self.pttErrCode == PTT.ErrorCode.NoPermission:
-            self.msg.emit('使用文章編號: 無發文權限')
-        else:
-            self.msg.emit('使用文章編號: 推文失敗')
-        self.signal.emit(SignalCode.PushComplete)
+        try:
+            self.pttErrCode = self.PTTBot.push(board, PTT.PushType.Push, content, PostIndex=post_index)
+            if self.pttErrCode == PTT.ErrorCode.Success:
+                self.msg.emit('推文成功')
+            elif self.pttErrCode == PTT.ErrorCode.ErrorInput:
+                self.msg.emit('使用文章編號: 參數錯誤')
+            elif self.pttErrCode == PTT.ErrorCode.NoPermission:
+                self.msg.emit('使用文章編號: 無發文權限')
+            else:
+                self.msg.emit('使用文章編號: 推文失敗')
+            self.signal.emit(SignalCode.PushComplete)
+        except:
+            self.msg.emit('推文失敗: 可能文章過長 無法連續推文 或其他奇奇怪怪的因素')
  
 # pip install pyinstaller
 # pyinstaller turtleHelper.spec
@@ -411,7 +414,7 @@ class MainWidget(QWidget):
         edit_post_form.addRow(self.edit_content_label, self.edit_content_input)
         edit_post_form.addRow(self.edit_content_button)
 
-        edit_post_group = QGroupBox('底部修文')
+        edit_post_group = QGroupBox('底部修文(非常不穩定, 很容易當機)')
         edit_post_group.setLayout(edit_post_form)
 
         v_box.addWidget(board_info_group)

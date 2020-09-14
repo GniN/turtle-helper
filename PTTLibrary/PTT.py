@@ -1122,10 +1122,10 @@ class Library(object):
         while TempEndIndex <= len(PushContent):
 
             Temp = ''
-            while len(Temp.encode('big5')) < MaxPushLength:
+            while len(Temp.encode('utf-8')) < MaxPushLength:
                 Temp = PushContent[TempStartIndex:TempEndIndex]
                 
-                if not len(Temp.encode('big5')) < MaxPushLength:
+                if not len(Temp.encode('utf-8')) < MaxPushLength:
                     break
                 elif PushContent == Temp:
                     break
