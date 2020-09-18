@@ -1072,7 +1072,7 @@ class Library(object):
             self.Log('儲存編輯文章發生未知錯誤')
             return ErrCode
 
-    def push(self, Board, inputPushType, PushContent, PostID='', PostIndex=0):
+    def push(self, Board, inputPushType, PushContent, PostID='', PostIndex=0, IdLength=10):
         
         self.__IdleTime = 0
         ConnectIndex = 0
@@ -1110,7 +1110,7 @@ class Library(object):
             self.__ErrorCode = ErrCode
             return ErrCode
 
-        MaxPushLength = 45
+        MaxPushLength = 60 - IdLength
 
         self.__PushShow = False
         PushList = []
@@ -1122,10 +1122,10 @@ class Library(object):
         while TempEndIndex <= len(PushContent):
 
             Temp = ''
-            while len(Temp.encode('utf-8')) < MaxPushLength:
+            while len(Temp.encode(encoding='big-5', errors='replace')) < MaxPushLength:
                 Temp = PushContent[TempStartIndex:TempEndIndex]
                 
-                if not len(Temp.encode('utf-8')) < MaxPushLength:
+                if not len(Temp.encode(encoding='big-5', errors='replace')) < MaxPushLength:
                     break
                 elif PushContent == Temp:
                     break

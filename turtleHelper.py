@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import pyqtSlot, QThread, pyqtSignal
+from PyQt5.QtCore import pyqtSlot, QThread, pyqtSignal, QSettings
 from PyQt5 import QtGui, QtCore
 import PyQt5.sip
 import os
@@ -109,7 +109,7 @@ class PTTThread(QThread):
     def push(self, board, post_index, content):
         self.msg.emit('準備推文')
         try:
-            self.pttErrCode = self.PTTBot.push(board, PTT.PushType.Push, content, PostIndex=post_index)
+            self.pttErrCode = self.PTTBot.push(board, PTT.PushType.Push, content, PostIndex=post_index, IdLength=len(self.ptt_id))
             if self.pttErrCode == PTT.ErrorCode.Success:
                 self.msg.emit('推文成功')
             elif self.pttErrCode == PTT.ErrorCode.ErrorInput:
@@ -134,6 +134,7 @@ class App(QMainWindow):
         self._ptt.signal.connect(self.getSignal)
         self._ptt.progress.connect(self.getProgress)
         self._ptt.start()
+        self.settings = QSettings('Turtle', 'helper')
 
         self.initUI()
  
@@ -144,12 +145,12 @@ class App(QMainWindow):
         self.setWindowTitle(self.title)
         self.central_widget = QStackedWidget()
         self.setCentralWidget(self.central_widget)
-
         self.widget = Login(self)
         self.widget.password_input.returnPressed.connect(self.login)
         self.widget.login_button.clicked.connect(self.login)
         self.central_widget.addWidget(self.widget)
         self.central_widget.setCurrentWidget(self.widget)
+        self.widget.account_input.setText(self.settings.value('id'))
         self.show()
 
     def login(self):
@@ -159,6 +160,7 @@ class App(QMainWindow):
         self.widget.password_input.setDisabled(True)
         self.widget.login_button.setDisabled(True)
         self._ptt.ptt_id = self.widget.account_input.text()
+        self.settings.setValue('id', self._ptt.ptt_id) 
         self._ptt.password = self.widget.password_input.text()
         self._ptt.queue.put(Task('login'))
         
@@ -173,7 +175,20 @@ class App(QMainWindow):
             self.widget.quickPushFormButtons[i].clicked.connect(partial(self.push, i, False))
             self.widget.quickPushFormControls[i].returnPressed.connect(partial(self.push, i, True))
         self.widget.edit_content_button.clicked.connect(self.edit_post)
+        self.widget.multi_line_push_button.clicked.connect(self.multi_line_push)
         self.resize(600, 20)
+
+    def multi_line_push(self):
+        board = self.widget.board_input.text()
+        post_index = int(self.widget.post_index_input.text())
+        msgs = self.widget.multi_line_push_input.toPlainText().split('\n')
+        self.statusBar().showMessage('推文中')
+        try:
+            for m in msgs:
+                self._ptt.queue.put(Task('push', text = m, post_index=post_index, board=board))
+        except:
+            self.statusBar().showMessage('推文失敗, 不明原因')    
+        self.statusBar().showMessage('推文成功')
 
     def edit_post(self):
         board = self.widget.board_input.text()
@@ -397,12 +412,28 @@ class MainWidget(QWidget):
         fase_push_group = QGroupBox('快速推文')
         fase_push_group.setLayout(fast_push_grid)
 
-        edit_post_form = QFormLayout()
-
         # self.push_content_label = QLabel('連續推文')
         # self.push_content_input = QTextEdit()
         # self.push_content_input.setPlaceholderText('不同行會是不同推文')
         # self.push_content_button = QPushButton('連續推文')
+
+        # 連續推文
+        multi_line_push_form = QFormLayout()
+        self.multi_line_push_label = QLabel('連續推文')
+        self.multi_line_push_input = QTextEdit()
+        self.multi_line_push_input.setPlaceholderText('連續推文內容')
+        self.multi_line_push_button = QPushButton('推文')
+
+        multi_line_push_form.addRow(self.multi_line_push_label, self.multi_line_push_input)
+        multi_line_push_form.addRow(self.multi_line_push_button)
+
+        multi_line_push_group = QGroupBox('連續推文(以換行分開)')
+        multi_line_push_group.setLayout(multi_line_push_form)
+
+
+        # end 連續推文
+
+        edit_post_form = QFormLayout()
 
         self.edit_content_label = QLabel('底部修文')
         self.edit_content_input = QTextEdit()
@@ -419,6 +450,7 @@ class MainWidget(QWidget):
 
         v_box.addWidget(board_info_group)
         v_box.addWidget(fase_push_group)
+        v_box.addWidget(multi_line_push_group)
         v_box.addWidget(edit_post_group)
         v_box.addStretch()
         # self.push_tab.layout.addWidget(form_layout2)

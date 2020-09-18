@@ -3,7 +3,7 @@
 block_cipher = None
 
 a = Analysis(['turtleHelper.py'],
-             pathex=['C:\\Users\\Andy\\Documents\\projects\\turtle-bot-github'],
+             pathex=['C:\\Users\\WINDOWS_USER_NAME\\Documents\\projects\\turtle-helper'],
              binaries=[],
              datas=[('turtle.ico', '.')],
              hiddenimports=['PyQt5'],
