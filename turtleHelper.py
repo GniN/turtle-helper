@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import pyqtSlot, QThread, pyqtSignal, QSettings
+from PyQt5.QtGui import QIcon, QKeySequence, QPalette, QColor
+from PyQt5.QtCore import pyqtSlot, QThread, pyqtSignal, QSettings, Qt
 from PyQt5 import QtGui, QtCore
 import PyQt5.sip
 import os
@@ -9,11 +9,13 @@ import time
 import queue
 from functools import partial
 
-from PTTLibrary import PTT
-from PTTLibrary import Big5uao
-from signalCode import SignalCode
+from PyPtt import PTT
 
-VERSION = 'v1.07'
+LoginSuccess = 1
+LoginFailed = 2
+PushComplete = 3
+
+VERSION = 'v1.10'
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -41,9 +43,11 @@ class Task():
 class PTTThread(QThread):
     msg = pyqtSignal(str)
     signal = pyqtSignal(int)
+    log_msg_signal = pyqtSignal(str)
     progress = pyqtSignal(int)
     ptt_id = ''
     password = ''
+    logs = []
 
     def __init__(self):
         QThread.__init__(self)
@@ -54,18 +58,14 @@ class PTTThread(QThread):
 
     def handleTask(self, task):
         if task.name == 'login':
-            self.PTTBot = PTT.Library(self.ptt_id, self.password, False)
-            self.pttErrCode = self.PTTBot.login()
-            self.PTTBot.Log(self.pttErrCode)
-            if self.pttErrCode != PTT.ErrorCode.Success:
+            self.ptt_bot = PTT.API(log_handler=self.logHandler)
+            try:
+                self.ptt_bot.login(self.ptt_id, self.password)
+                self.msg.emit('登入成功')
+                self.signal.emit(LoginSuccess)
+            except:
+                self.signal.emit(LoginFailed)
                 self.msg.emit('登入失敗')
-                self.signal.emit(SignalCode.LoginFailed)
-                self.PTTBot.Log('登入失敗')
-
-            self.msg.emit('登入成功')
-            self.signal.emit(SignalCode.LoginSuccess)
-            
-            self.PTTBot.Log('登入成功! 準備進行動作...')
         elif task.name == 'sendMails':
             self.sendMails(task.kwargs['mails'], task.kwargs['backup'])
         elif task.name == 'push':
@@ -73,19 +73,15 @@ class PTTThread(QThread):
         elif task.name == 'editPost':
             self.editPost(task.kwargs['board'], task.kwargs['post_index'], task.kwargs['edit_msg'])
 
+    def logHandler(self, msg):
+        self.log_msg_signal.emit(msg)
+
     def run(self):
         while True:
             task = self.queue.get()
             if task == None:
                 break
             self.handleTask(task)
-
-    def editPost(self, board, postIndex, msg):
-        self.msg.emit('開始編輯文章')
-        self.PTTBot.gotoBoard(board)
-        self.PTTBot.gotoArticle(postIndex)
-        self.PTTBot.editArticle(msg)
-        self.msg.emit('編輯文章成功')
 
     def sendMails(self, mails, backup):
         self.progress.emit(0)
@@ -98,27 +94,19 @@ class PTTThread(QThread):
 
     def send(self, id, title, content, backup):
         self.msg.emit('準備寄信給' + id)
-        self.pttErrCode = self.PTTBot.mail(id, title, content, 0, backup)
-        if self.pttErrCode == PTT.ErrorCode.Success:
-            self.PTTBot.Log('寄信給 ' + id + ' 成功')
+        try:
+            self.pttErrCode = self.ptt_bot.mail(id, title, content, 0, backup)
+            self.ptt_bot.log('寄信給 ' + id + ' 成功')
             self.msg.emit('寄信給 ' + id + ' 成功')
-        else:
-            self.PTTBot.Log('寄信給 ' + id + ' 失敗')
-            self.msg.emit('寄信給 ' + id + ' 失敗')
+        except:
+            self.ptt_bot.log('寄信給 ' + id + ' 失敗')
+            self.msg.emit('寄信給 ' + id + ' 不明原因失敗')
     
     def push(self, board, post_index, content):
         self.msg.emit('準備推文')
         try:
-            self.pttErrCode = self.PTTBot.push(board, PTT.PushType.Push, content, PostIndex=post_index, IdLength=len(self.ptt_id))
-            if self.pttErrCode == PTT.ErrorCode.Success:
-                self.msg.emit('推文成功')
-            elif self.pttErrCode == PTT.ErrorCode.ErrorInput:
-                self.msg.emit('使用文章編號: 參數錯誤')
-            elif self.pttErrCode == PTT.ErrorCode.NoPermission:
-                self.msg.emit('使用文章編號: 無發文權限')
-            else:
-                self.msg.emit('使用文章編號: 推文失敗')
-            self.signal.emit(SignalCode.PushComplete)
+            self.ptt_bot.push(board, PTT.data_type.push_type.PUSH, content, post_index=post_index)
+            self.msg.emit('推文成功')
         except:
             self.msg.emit('推文失敗: 可能文章過長 無法連續推文 或其他奇奇怪怪的因素')
  
@@ -131,9 +119,12 @@ class App(QMainWindow):
 
         self._ptt = PTTThread()
         self._ptt.msg.connect(self.getMsg)
+        self._ptt.log_msg_signal.connect(self.getLog)
         self._ptt.signal.connect(self.getSignal)
         self._ptt.progress.connect(self.getProgress)
         self._ptt.start()
+        self.main_widget_init = False
+        self.logs = []
         self.settings = QSettings('Turtle', 'helper')
 
         self.initUI()
@@ -174,9 +165,10 @@ class App(QMainWindow):
         for i in range(len(self.widget.quickPushFormButtons)):
             self.widget.quickPushFormButtons[i].clicked.connect(partial(self.push, i, False))
             self.widget.quickPushFormControls[i].returnPressed.connect(partial(self.push, i, True))
-        self.widget.edit_content_button.clicked.connect(self.edit_post)
         self.widget.multi_line_push_button.clicked.connect(self.multi_line_push)
         self.resize(600, 20)
+        self.main_widget_init = True
+        self.updateLogs()
 
     def multi_line_push(self):
         board = self.widget.board_input.text()
@@ -189,15 +181,6 @@ class App(QMainWindow):
         except:
             self.statusBar().showMessage('推文失敗, 不明原因')    
         self.statusBar().showMessage('推文成功')
-
-    def edit_post(self):
-        board = self.widget.board_input.text()
-        post_index = int(self.widget.post_index_input.text())
-        edit_msg = self.widget.edit_content_input.toPlainText().replace('\n', '\r')
-        if len(edit_msg) > 0:
-            self._ptt.queue.put(Task('editPost', edit_msg = edit_msg, post_index=post_index, board=board))
-        else:
-            self.statusBar().showMessage('失敗, 推文內容為空白')
 
     def push(self, i, byEnter):
         if byEnter and not self.widget.enablePushOnEnterCheckbox.isChecked():
@@ -241,7 +224,6 @@ class App(QMainWindow):
             idx += 1
         
         return mail_list
-
 
     def sendMails(self):
         save_backup = self.widget.backup_input.isChecked()
@@ -302,16 +284,28 @@ class App(QMainWindow):
     def getMsg(self, msg):
         self.statusBar().showMessage(msg)
 
+    def updateLogs(self):
+        if self.main_widget_init:
+            self.widget.logs_display.setText('\n'.join(self.logs))
+            self.widget.logs_display.moveCursor(QtGui.QTextCursor.End)
+
+    def getLog(self, msg):
+        self.logs.append(msg)
+        if len(self.logs) >= 150 :
+            self.logs.pop(0)
+        self.updateLogs()
+
+
     def getSignal(self, signal):
-        if (signal == SignalCode.LoginFailed):
+        if (signal == LoginFailed):
             self.widget.account_input.setEnabled(True)
             self.widget.password_input.setEnabled(True)
             self.widget.login_button.setEnabled(True)
 
-        elif (signal == SignalCode.LoginSuccess):
+        elif (signal == LoginSuccess):
             self.toMainWidget()
 
-        elif (signal == SignalCode.PushComplete):
+        elif (signal == PushComplete):
             for button in self.widget.quickPushFormButtons:
                 button.setEnabled(True)
 
@@ -342,9 +336,9 @@ class Login(QWidget):
  
         self.layout.addLayout(form_layout)
 
-class MainWidget(QWidget):        
- 
-    def __init__(self, parent):   
+class MainWidget(QWidget):
+    
+    def __init__(self, parent):
         super(QWidget, self).__init__(parent)
 
         self.layout = QVBoxLayout(self)
@@ -352,6 +346,9 @@ class MainWidget(QWidget):
         self.tabs = QTabWidget()
         self.mail_tab = QWidget()	
         self.push_tab = QWidget()
+
+        self.logs_display = QTextEdit()
+        self.logs_display.setReadOnly(True)
         
         # Add tabs
         self.tabs.addTab(self.mail_tab,"海龜郵差")
@@ -361,6 +358,7 @@ class MainWidget(QWidget):
         self.createPushUI()
 
         self.layout.addWidget(self.tabs)
+        self.layout.addWidget(self.logs_display)
 
     def createPushUI(self):
         self.push_tab.layout = QVBoxLayout(self)
@@ -372,7 +370,7 @@ class MainWidget(QWidget):
         self.board_input = QLineEdit('turtlesoup')
         
         self.post_index_label = QLabel('文章編號')
-        self.post_index_input = QLineEdit()
+        self.post_index_input = QLineEdit('341')
 
         form_layout.addRow(self.board_label, self.board_input)
         form_layout.addRow(self.post_index_label, self.post_index_input)
@@ -412,11 +410,6 @@ class MainWidget(QWidget):
         fase_push_group = QGroupBox('快速推文')
         fase_push_group.setLayout(fast_push_grid)
 
-        # self.push_content_label = QLabel('連續推文')
-        # self.push_content_input = QTextEdit()
-        # self.push_content_input.setPlaceholderText('不同行會是不同推文')
-        # self.push_content_button = QPushButton('連續推文')
-
         # 連續推文
         multi_line_push_form = QFormLayout()
         self.multi_line_push_label = QLabel('連續推文')
@@ -437,23 +430,11 @@ class MainWidget(QWidget):
 
         self.edit_content_label = QLabel('底部修文')
         self.edit_content_input = QTextEdit()
-        self.edit_content_input.setPlaceholderText('底部修文內容')
-        self.edit_content_button = QPushButton('修文')
-
-        # edit_post_form.addRow(self.push_content_label, self.push_content_input)
-        # edit_post_form.addRow(self.push_content_button)
-        edit_post_form.addRow(self.edit_content_label, self.edit_content_input)
-        edit_post_form.addRow(self.edit_content_button)
-
-        edit_post_group = QGroupBox('底部修文(非常不穩定, 很容易當機)')
-        edit_post_group.setLayout(edit_post_form)
 
         v_box.addWidget(board_info_group)
         v_box.addWidget(fase_push_group)
         v_box.addWidget(multi_line_push_group)
-        v_box.addWidget(edit_post_group)
         v_box.addStretch()
-        # self.push_tab.layout.addWidget(form_layout2)
         self.push_tab.setLayout(v_box)
 
     
@@ -500,19 +481,19 @@ if __name__ == '__main__':
     
     app.setStyle('Fusion')
     palette = QtGui.QPalette()
-    palette.setColor(QtGui.QPalette.Window, QtGui.QColor(53,53,53))
-    palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
-    palette.setColor(QtGui.QPalette.Base, QtGui.QColor(15,15,15))
-    palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(53,53,53))
-    palette.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
-    palette.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.white)
-    palette.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
-    palette.setColor(QtGui.QPalette.Button, QtGui.QColor(53,53,53))
-    palette.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.white)
-    palette.setColor(QtGui.QPalette.BrightText, QtCore.Qt.red)
-         
-    palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor(142,45,197).lighter())
-    palette.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.black)
+    palette.setColor(QtGui.QPalette.Window, QColor(53, 53, 53))
+    palette.setColor(QtGui.QPalette.WindowText, Qt.white)
+    palette.setColor(QtGui.QPalette.Base, QColor(25, 25, 25))
+    palette.setColor(QtGui.QPalette.AlternateBase, QColor(53, 53, 53))
+    palette.setColor(QtGui.QPalette.ToolTipBase, Qt.white)
+    palette.setColor(QtGui.QPalette.ToolTipText, Qt.white)
+    palette.setColor(QtGui.QPalette.Text, Qt.white)
+    palette.setColor(QtGui.QPalette.Button, QColor(53, 53, 53))
+    palette.setColor(QtGui.QPalette.ButtonText, Qt.white)
+    palette.setColor(QtGui.QPalette.BrightText, Qt.red)
+    palette.setColor(QtGui.QPalette.Link, QColor(42, 130, 218))
+    palette.setColor(QtGui.QPalette.Highlight, QColor(42, 130, 218))
+    palette.setColor(QtGui.QPalette.HighlightedText, Qt.black)
     app.setPalette(palette)
 
     ex = App()
