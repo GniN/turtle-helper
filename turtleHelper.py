@@ -15,7 +15,7 @@ LoginSuccess = 1
 LoginFailed = 2
 PushComplete = 3
 
-VERSION = 'v1.10'
+VERSION = 'v1.11'
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -47,6 +47,7 @@ class PTTThread(QThread):
     progress = pyqtSignal(int)
     ptt_id = ''
     password = ''
+    enable_trace = False
     logs = []
 
     def __init__(self):
@@ -58,7 +59,10 @@ class PTTThread(QThread):
 
     def handleTask(self, task):
         if task.name == 'login':
-            self.ptt_bot = PTT.API(log_handler=self.logHandler)
+            level = PTT.log.level.INFO
+            if self.enable_trace:
+                level = PTT.log.level.TRACE
+            self.ptt_bot = PTT.API(log_handler=self.logHandler, log_level=level)
             try:
                 self.ptt_bot.login(self.ptt_id, self.password)
                 self.msg.emit('登入成功')
@@ -72,9 +76,19 @@ class PTTThread(QThread):
             self.push(task.kwargs['board'], task.kwargs['post_index'], task.kwargs['text'])
         elif task.name == 'editPost':
             self.editPost(task.kwargs['board'], task.kwargs['post_index'], task.kwargs['edit_msg'])
+        elif task.name == 'changeLoglevel':
+            self.setLogLevelToTrace(task.kwargs['toTrace'])
 
     def logHandler(self, msg):
         self.log_msg_signal.emit(msg)
+
+    def setLogLevelToTrace(self, toTrace):
+        if toTrace:
+            self.ptt_bot.log("set log level to trace")
+            self.ptt_bot.log_level = PTT.log.level.TRACE
+        else:
+            self.ptt_bot.log("set log level to info")
+            self.ptt_bot.log_level = PTT.log.level.INFO
 
     def run(self):
         while True:
@@ -153,6 +167,7 @@ class App(QMainWindow):
         self._ptt.ptt_id = self.widget.account_input.text()
         self.settings.setValue('id', self._ptt.ptt_id) 
         self._ptt.password = self.widget.password_input.text()
+        self._ptt.enable_trace = self.widget.enable_trace.isChecked()
         self._ptt.queue.put(Task('login'))
         
     def toMainWidget(self):
@@ -322,6 +337,7 @@ class Login(QWidget):
         self.account_label = QLabel('Account')
         self.account_input = QLineEdit()
         self.account_input.setPlaceholderText('PTT Account')
+        self.enable_trace = QCheckBox('啟用Trace')
 
         self.password_label = QLabel('Password')
         self.password_input = QLineEdit()
@@ -332,6 +348,7 @@ class Login(QWidget):
 
         form_layout.addRow(self.account_label, self.account_input)
         form_layout.addRow(self.password_label, self.password_input)
+        form_layout.addRow(self.enable_trace)
         form_layout.addRow(self.login_button)
  
         self.layout.addLayout(form_layout)
@@ -370,7 +387,7 @@ class MainWidget(QWidget):
         self.board_input = QLineEdit('turtlesoup')
         
         self.post_index_label = QLabel('文章編號')
-        self.post_index_input = QLineEdit('341')
+        self.post_index_input = QLineEdit('')
 
         form_layout.addRow(self.board_label, self.board_input)
         form_layout.addRow(self.post_index_label, self.post_index_input)
