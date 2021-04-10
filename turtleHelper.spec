@@ -3,10 +3,10 @@
 block_cipher = None
 
 a = Analysis(['turtleHelper.py'],
-             pathex=['C:\\Users\\WINDOWS_USER_NAME\\Documents\\projects\\turtle-helper'],
+             pathex=['C:\\Users\\t0336\\Documents\\projects\\turtle-helper'],
              binaries=[],
              datas=[('turtle.ico', '.')],
-             hiddenimports=['PyQt5'],
+             hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],
              excludes=[],

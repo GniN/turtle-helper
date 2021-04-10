@@ -15,7 +15,7 @@ LoginSuccess = 1
 LoginFailed = 2
 PushComplete = 3
 
-VERSION = 'v1.11'
+VERSION = 'v1.12'
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -30,8 +30,9 @@ def resource_path(relative_path):
 Logo = resource_path("turtle.ico")
 
 class Mail():
-    def __init__(self, receiver, title, content):
+    def __init__(self, receiver, title, sign_file, content):
         self.receiver = receiver
+        self.sign_file = sign_file
         self.title = title
         self.content = content
 
@@ -70,14 +71,16 @@ class PTTThread(QThread):
             except:
                 self.signal.emit(LoginFailed)
                 self.msg.emit('登入失敗')
-        elif task.name == 'sendMails':
-            self.sendMails(task.kwargs['mails'], task.kwargs['backup'])
         elif task.name == 'push':
             self.push(task.kwargs['board'], task.kwargs['post_index'], task.kwargs['text'])
+        elif task.name == 'sendMails':
+            self.sendMails(task.kwargs['mails'], task.kwargs['backup'])
         elif task.name == 'editPost':
             self.editPost(task.kwargs['board'], task.kwargs['post_index'], task.kwargs['edit_msg'])
         elif task.name == 'changeLoglevel':
             self.setLogLevelToTrace(task.kwargs['toTrace'])
+        elif task.name == 'giveMoney':
+            self.giveMoney(task.kwargs['amount'], task.kwargs['receivers'])
 
     def logHandler(self, msg):
         self.log_msg_signal.emit(msg)
@@ -97,19 +100,35 @@ class PTTThread(QThread):
                 break
             self.handleTask(task)
 
-    def sendMails(self, mails, backup):
+    def giveMoney(self, amount, receivers):
         self.progress.emit(0)
-        
         idx = 0
-        for m in mails:
-            self.send(m.receiver, m.title, m.content, backup)
+        for id in receivers:
+            self.ptt_bot.log('準備發錢給' + id)
+            try:
+                self.pttErrCode = self.ptt_bot.give_money(id, int(amount))
+                self.ptt_bot.log('發錢給 ' + id + ' 成功')
+                self.msg.emit('發錢給 ' + id + ' 成功')
+            except Exception as e:
+                self.ptt_bot.log(str(e))
+                self.ptt_bot.log('發錢給 ' + id + ' 失敗')
+                self.msg.emit('發錢給 ' + id + ' 不明原因失敗')
+
             idx += 1
             self.progress.emit(idx)
 
-    def send(self, id, title, content, backup):
+    def sendMails(self, mails, backup):
+        self.progress.emit(0)
+        idx = 0
+        for m in mails:
+            self.send(m.receiver, m.title, m.content, m.sign_file, backup)
+            idx += 1
+            self.progress.emit(idx)
+
+    def send(self, id, title, content, sign_file, backup):
         self.msg.emit('準備寄信給' + id)
         try:
-            self.pttErrCode = self.ptt_bot.mail(id, title, content, 0, backup)
+            self.pttErrCode = self.ptt_bot.mail(id, title, content, sign_file, backup)
             self.ptt_bot.log('寄信給 ' + id + ' 成功')
             self.msg.emit('寄信給 ' + id + ' 成功')
         except:
@@ -181,6 +200,7 @@ class App(QMainWindow):
             self.widget.quickPushFormButtons[i].clicked.connect(partial(self.push, i, False))
             self.widget.quickPushFormControls[i].returnPressed.connect(partial(self.push, i, True))
         self.widget.multi_line_push_button.clicked.connect(self.multi_line_push)
+        self.widget.send_money_button.clicked.connect(self.sendMoney)
         self.resize(600, 20)
         self.main_widget_init = True
         self.updateLogs()
@@ -215,6 +235,7 @@ class App(QMainWindow):
         receivers = self.widget.receivers_input.text()
         commands = self.widget.commands_input.text()
         titles = self.widget.title_input.text()
+        sign_file = self.widget.sign_file_input.text()
         content = self.widget.content_input.toPlainText()
 
         receiver_list = receivers.split('@')
@@ -235,7 +256,7 @@ class App(QMainWindow):
             
             c = content.replace('[指令]', command).replace('\n', '\r')
 
-            mail_list.append(Mail(r, title, c))
+            mail_list.append(Mail(r, title, sign_file, c))
             idx += 1
         
         return mail_list
@@ -246,6 +267,18 @@ class App(QMainWindow):
         mails = self.createMails()
         self.widget.progressbar.setMaximum(len(mails))
         self._ptt.queue.put(Task('sendMails', mails = mails, backup = save_backup))
+    
+    def sendMoney(self):
+        amount = self.widget.money_amount_input.text()
+        receivers = self.widget.money_receivers_input.toPlainText().split('\n')
+        receivers = list(filter(None, receivers))
+        self.widget.progressbar.setMaximum(len(receivers))
+        self.statusBar().showMessage('發錢中')
+        try:
+            self._ptt.queue.put(Task('giveMoney', amount=amount, receivers=receivers))
+        except Exception as e:
+            self.statusBar().showMessage('發錢失敗, 不明原因')    
+
     
     def createPreviewContent(self, mail):
         content = '收件人:\t'+mail.receiver+'\r'\
@@ -363,6 +396,7 @@ class MainWidget(QWidget):
         self.tabs = QTabWidget()
         self.mail_tab = QWidget()	
         self.push_tab = QWidget()
+        self.give_money_tab = QWidget()
 
         self.logs_display = QTextEdit()
         self.logs_display.setReadOnly(True)
@@ -370,12 +404,37 @@ class MainWidget(QWidget):
         # Add tabs
         self.tabs.addTab(self.mail_tab,"海龜郵差")
         self.tabs.addTab(self.push_tab,"推文幫手")
+        self.tabs.addTab(self.give_money_tab,"噴錢槍")
 
         self.createMailUI()
         self.createPushUI()
+        self.createGiveMoneyUI()
 
         self.layout.addWidget(self.tabs)
         self.layout.addWidget(self.logs_display)
+
+    def createGiveMoneyUI(self):
+        self.give_money_tab.layout = QVBoxLayout(self)
+        v_box = QVBoxLayout()
+        form_layout = QFormLayout()
+        
+        self.board_label = QLabel('看板')
+        self.board_input = QLineEdit('turtlesoup')
+
+        self.money_amount_label = QLabel('金額(是稅後喔!!)')
+        self.money_amount_input = QLineEdit('')
+
+        self.money_receivers_label = QLabel('收款人(以換行分隔)')
+        self.money_receivers_input = QTextEdit()
+
+        self.send_money_button = QPushButton('發錢')
+
+
+        form_layout.addRow(self.money_amount_label, self.money_amount_input)
+        form_layout.addRow(self.money_receivers_label, self.money_receivers_input)
+        form_layout.addRow(self.send_money_button)
+
+        self.give_money_tab.setLayout(form_layout)
 
     def createPushUI(self):
         self.push_tab.layout = QVBoxLayout(self)
@@ -472,6 +531,10 @@ class MainWidget(QWidget):
         self.title_input = QLineEdit()
         self.title_input.setPlaceholderText('可用@號分隔不同收件人收到的標題')
 
+        self.sign_file_label = QLabel('簽名檔')
+        self.sign_file_input = QLineEdit('0')
+        self.sign_file_input.setPlaceholderText('0 = 不選簽名檔 請用數字[1-9]')
+
         self.content_label = QLabel('內文')
         self.content_input = QTextEdit()
 
@@ -485,6 +548,7 @@ class MainWidget(QWidget):
         form_layout.addRow(self.receivers_label, self.receivers_input)
         form_layout.addRow(self.commands_label, self.commands_input)
         form_layout.addRow(self.title_label, self.title_input)
+        form_layout.addRow(self.sign_file_label, self.sign_file_input)
         form_layout.addRow(self.content_label, self.content_input)
         form_layout.addRow(self.backup_input)
         form_layout.addRow(self.progressbar)
