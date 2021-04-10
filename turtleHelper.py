@@ -15,7 +15,7 @@ LoginSuccess = 1
 LoginFailed = 2
 PushComplete = 3
 
-VERSION = 'v1.12'
+VERSION = 'v1.13'
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -81,6 +81,8 @@ class PTTThread(QThread):
             self.setLogLevelToTrace(task.kwargs['toTrace'])
         elif task.name == 'giveMoney':
             self.giveMoney(task.kwargs['amount'], task.kwargs['receivers'])
+        elif task.name == 'giveDifferentMoney':
+            self.giveDifferentMoney(task.kwargs['receivers_and_amount'])
 
     def logHandler(self, msg):
         self.log_msg_signal.emit(msg)
@@ -99,6 +101,26 @@ class PTTThread(QThread):
             if task == None:
                 break
             self.handleTask(task)
+
+    def giveDifferentMoney(self, receivers_and_amount):
+        self.progress.emit(0)
+        idx = 0
+        for id_and_amount in receivers_and_amount:
+            try:
+                id = id_and_amount.split(':')[0]
+                amount = int(id_and_amount.split(':')[1])
+                self.ptt_bot.log('準備發錢給' + id + ' 共' + str(amount))
+
+                self.pttErrCode = self.ptt_bot.give_money(id, int(amount))
+                self.ptt_bot.log('發錢給 ' + id + ' 成功')
+                self.msg.emit('發錢給 ' + id + ' 成功')
+            except Exception as e:
+                self.ptt_bot.log(str(e))
+                self.ptt_bot.log('發錢給 ' + id + ' 失敗')
+                self.msg.emit('發錢給 ' + id + ' 不明原因失敗')
+
+            idx += 1
+            self.progress.emit(idx)
 
     def giveMoney(self, amount, receivers):
         self.progress.emit(0)
@@ -201,6 +223,7 @@ class App(QMainWindow):
             self.widget.quickPushFormControls[i].returnPressed.connect(partial(self.push, i, True))
         self.widget.multi_line_push_button.clicked.connect(self.multi_line_push)
         self.widget.send_money_button.clicked.connect(self.sendMoney)
+        self.widget.send_different_money_button.clicked.connect(self.sendMoneyDifferent)
         self.resize(600, 20)
         self.main_widget_init = True
         self.updateLogs()
@@ -277,7 +300,17 @@ class App(QMainWindow):
         try:
             self._ptt.queue.put(Task('giveMoney', amount=amount, receivers=receivers))
         except Exception as e:
-            self.statusBar().showMessage('發錢失敗, 不明原因')    
+            self.statusBar().showMessage('發錢失敗, 不明原因')  
+
+    def sendMoneyDifferent(self):
+        receivers_and_amount = self.widget.money_receivers_amount_input.toPlainText().split('\n')
+        receivers_and_amount = list(filter(None, receivers_and_amount))
+        self.widget.progressbar.setMaximum(len(receivers_and_amount))
+        self.statusBar().showMessage('發錢中')
+        try:
+            self._ptt.queue.put(Task('giveDifferentMoney', receivers_and_amount=receivers_and_amount))
+        except Exception as e:
+            self.statusBar().showMessage('發錢失敗, 不明原因')  
 
     
     def createPreviewContent(self, mail):
@@ -416,11 +449,10 @@ class MainWidget(QWidget):
     def createGiveMoneyUI(self):
         self.give_money_tab.layout = QVBoxLayout(self)
         v_box = QVBoxLayout()
-        form_layout = QFormLayout()
         
-        self.board_label = QLabel('看板')
-        self.board_input = QLineEdit('turtlesoup')
-
+        # 定額
+        fixed_give_money_group = QGroupBox('定額發錢(每個人收到一樣的金額)')
+        fixed_money_form = QFormLayout()
         self.money_amount_label = QLabel('金額(是稅後喔!!)')
         self.money_amount_input = QLineEdit('')
 
@@ -429,12 +461,28 @@ class MainWidget(QWidget):
 
         self.send_money_button = QPushButton('發錢')
 
+        fixed_money_form.addRow(self.money_amount_label, self.money_amount_input)
+        fixed_money_form.addRow(self.money_receivers_label, self.money_receivers_input)
+        fixed_money_form.addRow(self.send_money_button)
 
-        form_layout.addRow(self.money_amount_label, self.money_amount_input)
-        form_layout.addRow(self.money_receivers_label, self.money_receivers_input)
-        form_layout.addRow(self.send_money_button)
+        fixed_give_money_group.setLayout(fixed_money_form)
+        # 定額END
 
-        self.give_money_tab.setLayout(form_layout)
+        different_give_money_group = QGroupBox('非定額發錢 (每個人收到不一樣的金額)')
+        different_money_form = QFormLayout()
+        self.money_receivers_amount_label = QLabel('收款人+金額(以換行分隔 也是稅後喔!!)')
+        self.money_receivers_amount_input = QTextEdit()
+        self.money_receivers_amount_input.setPlaceholderText('id:金額\nid:金額\nid:金額')
+        self.send_different_money_button = QPushButton('發錢')
+
+        different_money_form.addRow(self.money_receivers_amount_label, self.money_receivers_amount_input)
+        different_money_form.addRow(self.send_different_money_button)
+
+        different_give_money_group.setLayout(different_money_form)
+
+        v_box.addWidget(fixed_give_money_group)
+        v_box.addWidget(different_give_money_group)
+        self.give_money_tab.setLayout(v_box)
 
     def createPushUI(self):
         self.push_tab.layout = QVBoxLayout(self)
