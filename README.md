@@ -6,6 +6,12 @@
 pip3 install -r requirements.txt
 ```
 
+若需要直接安裝master branch上的最新版可以使用這個指令
+```
+pip3 install https://github.com/PttCodingMan/PyPtt@master
+```
+
+
 ## 執行
 -------------------
 ```
