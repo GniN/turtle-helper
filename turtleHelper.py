@@ -15,7 +15,7 @@ LoginSuccess = 1
 LoginFailed = 2
 PushComplete = 3
 
-VERSION = 'v1.16'
+VERSION = 'v1.17.3'
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """

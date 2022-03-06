@@ -16,7 +16,7 @@ jobs:
     - name: install packages
       run: |
         pip install -r requirements.txt
-    - run: pyinstaller --noconfirm --onefile --console --no-embed-manifest  "./turtleHelper.py"
+    - run: pyinstaller --noconfirm --onefile --noconsole "./turtleHelper.py"
 
     - uses: "marvinpinto/action-automatic-releases@latest"
       with:
