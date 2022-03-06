@@ -23,6 +23,7 @@ python turtleHelper.py
 - 輔助寄信
 - 輔助推文
 - 輔助底部修文
+- 發錢
 
 ![登入畫面](/screenshots/001.png "登入畫面")
 
@@ -38,6 +39,11 @@ python turtleHelper.py
 pyinstaller turtleHelper.spec
 ```
 
+自動發布版本
+```
+git tag -a v1.15 -m "new version 1.15" 
+git push origin --tags
+```
 
 需求
 -------------------
@@ -48,3 +54,4 @@ pyinstaller turtleHelper.spec
 ###### 如果這專案有幫助，請去原作者的家請他喝咖啡
 ###### XMR 贊助位址
 ###### 448CUe2q4Ecf9tx6rwanrqM9kfCwqpNbhJ5jtrTf9FHqHNq7Lvv9uBoQ74SEaAu9FFceNBr6p3W1yhqPcxPPSSTv2ctufnQ
+

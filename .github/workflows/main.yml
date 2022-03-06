@@ -1,0 +1,26 @@
+name: Package Application with Pyinstaller
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: install packages
+      run: |
+        pip install -r requirements.txt
+    - run: pyinstaller --noconfirm --onefile --console --no-embed-manifest  "./turtleHelper.py"
+
+    - uses: "marvinpinto/action-automatic-releases@latest"
+      with:
+        repo_token: "${{ secrets.GITHUB_TOKEN }}"
+        prerelease: false
+        files: |
+          ./dist/*

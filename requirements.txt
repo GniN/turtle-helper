@@ -1,2 +1,2 @@
 PyQt5
-PyPtt
+git+git://github.com/GniN/PyPtt.git
