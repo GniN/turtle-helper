@@ -15,7 +15,7 @@ LoginSuccess = 1
 LoginFailed = 2
 PushComplete = 3
 
-VERSION = 'v1.17.3'
+VERSION = 'v1.17.4'
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -122,7 +122,7 @@ class PTTThread(QThread):
                 amount = int(id_and_amount.split(':')[1])
                 self.ptt_bot.log('準備發錢給' + id + ' 共' + str(amount))
 
-                self.pttErrCode = self.ptt_bot.give_money(id, int(amount), edit_bag, title, content)
+                self.pttErrCode = self.ptt_bot.give_money(id, int(amount), title, content)
                 self.ptt_bot.log('發錢給 ' + id + ' 成功')
                 self.msg.emit('發錢給 ' + id + ' 成功')
             except Exception as e:
@@ -139,7 +139,7 @@ class PTTThread(QThread):
         for id in receivers:
             self.ptt_bot.log('準備發錢給' + id)
             try:
-                self.pttErrCode = self.ptt_bot.give_money(id, int(amount), edit_bag, title, content)
+                self.pttErrCode = self.ptt_bot.give_money(id, int(amount), title, content)
                 self.ptt_bot.log('發錢給 ' + id + ' 成功')
                 self.msg.emit('發錢給 ' + id + ' 成功')
             except Exception as e:
