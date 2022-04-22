@@ -41,7 +41,7 @@ pyinstaller turtleHelper.spec
 
 自動發布版本
 ```
-git tag -a v1.17.1 -m "new version 1.17.1" 
+git tag -a v1.17.5 -m "new version 1.17.5" 
 git push origin --tags
 ```
 
