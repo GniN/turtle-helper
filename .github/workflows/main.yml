@@ -6,6 +6,19 @@ on:
       - "v*"
 
 jobs:
+  create_release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+
   build:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -23,9 +36,9 @@ jobs:
       run: |
         pip install -r requirements.txt
     - run: pyinstaller --noconfirm --onefile --noconsole "./turtleHelper.py"
-    - uses: "marvinpinto/action-automatic-releases@latest"
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
       with:
-        repo_token: "${{ secrets.GITHUB_TOKEN }}"
-        prerelease: true
         files: |
           ./dist/*
