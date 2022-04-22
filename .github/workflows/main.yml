@@ -23,10 +23,9 @@ jobs:
       run: |
         pip install -r requirements.txt
     - run: pyinstaller --noconfirm --onefile --noconsole "./turtleHelper.py"
-
     - uses: actions/upload-artifact@v2
       with:
         repo_token: "${{ secrets.GITHUB_TOKEN }}"
         prerelease: false
-        files: |
+        path: |
           ./dist/*
