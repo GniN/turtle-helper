@@ -1,3 +1,4 @@
 PyQt5
 pyinstaller
+nuitka 
 git+https://github.com/GniN/PyPtt.git

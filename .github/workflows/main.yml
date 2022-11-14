@@ -17,17 +17,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - uses: actions/setup-python@v2
-      with:
-        python-version: 3.10.4
 
-    - name: install packages
-      run: |
-        pip install -r requirements.txt
-    - run: pyinstaller --noconfirm --onefile --noconsole "./turtleHelper.py"
-    - uses: "marvinpinto/action-automatic-releases@latest"
+    # Build python script into a stand-alone exe
+    - uses: Nuitka/Nuitka-Action@v0.4
       with:
-        repo_token: "${{ secrets.GITHUB_TOKEN }}"
-        prerelease: true
-        files: |
-          ./dist/*
+        script-name: turtleHelper.py
+
+    # Uploads artifact
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: exe
+        path: build/turtleHelper.exe
