@@ -33,7 +33,7 @@ jobs:
 
     - name: Build exe
       run: |
-        python -m nuitka --windows-disable-console --standalone --plugin-enable=pyqt5 --onefile .\turtleHelper.py
+        python -m nuitka --windows-disable-console --standalone --assume-yes-for-downloads --plugin-enable=pyqt5 --onefile .\turtleHelper.py
 
     # Uploads artifact
     - name: Upload Artifact
