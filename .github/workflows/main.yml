@@ -33,11 +33,11 @@ jobs:
 
     - name: Build exe
       run: |
-        python -m nuitka .\turtleHelper.py
+        python -m nuitka --windows-disable-console --standalone --onefile .\turtleHelper.py
 
     # Uploads artifact
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: exe
+        name: turtleHelper.exe
         path: turtleHelper.exe
