@@ -1,4 +1,3 @@
 PyQt5
-pyinstaller
-nuitka=1.2
+nuitka==1.2
 git+https://github.com/GniN/PyPtt.git
