@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ['windows-latest', 'ubuntu-latest', 'macos-latest']
+        os: ['windows-latest']
 
     steps:
     - uses: actions/checkout@v2
@@ -36,9 +36,13 @@ jobs:
       with:
         script-name: turtleHelper.py
 
+    - name: Build exe
+      run: |
+        python -m nuitka .\turtleHelper.py
+
     # Uploads artifact
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
         name: exe
-        path: build/turtleHelper.exe
+        path: turtleHelper.exe
