@@ -47,11 +47,5 @@ git push origin --tags
 
 需求
 -------------------
-###### Python 3.6
-
-贊助
--------------------
-###### 如果這專案有幫助，請去原作者的家請他喝咖啡
-###### XMR 贊助位址
-###### 448CUe2q4Ecf9tx6rwanrqM9kfCwqpNbhJ5jtrTf9FHqHNq7Lvv9uBoQ74SEaAu9FFceNBr6p3W1yhqPcxPPSSTv2ctufnQ
+###### Python 3.10
 
