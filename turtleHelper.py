@@ -85,14 +85,16 @@ class PTTThread(QThread):
                 task.kwargs['receivers'],
                 task.kwargs['edit_bag'],
                 task.kwargs['bag_title'],
-                task.kwargs['bag_content']
+                task.kwargs['bag_content'],
+                task.kwargs['anonymous']
                 )
         elif task.name == 'giveDifferentMoney':
             self.giveDifferentMoney(
                 task.kwargs['receivers_and_amount'],
                 task.kwargs['edit_bag'],
                 task.kwargs['bag_title'],
-                task.kwargs['bag_content']
+                task.kwargs['bag_content'],
+                task.kwargs['anonymous']
                 )
 
     def logHandler(self, msg):
@@ -113,7 +115,7 @@ class PTTThread(QThread):
                 break
             self.handleTask(task)
 
-    def giveDifferentMoney(self, receivers_and_amount, edit_bag, title, content):
+    def giveDifferentMoney(self, receivers_and_amount, edit_bag, title, content, anonymous):
         self.progress.emit(0)
         idx = 0
         for id_and_amount in receivers_and_amount:
@@ -122,7 +124,7 @@ class PTTThread(QThread):
                 amount = int(id_and_amount.split(':')[1])
                 self.ptt_bot.log('準備發錢給' + id + ' 共' + str(amount))
 
-                self.pttErrCode = self.ptt_bot.give_money(id, int(amount), title, content)
+                self.pttErrCode = self.ptt_bot.give_money(id, int(amount), title, content, anonymous)
                 self.ptt_bot.log('發錢給 ' + id + ' 成功')
                 self.msg.emit('發錢給 ' + id + ' 成功')
             except Exception as e:
@@ -133,13 +135,13 @@ class PTTThread(QThread):
             idx += 1
             self.progress.emit(idx)
 
-    def giveMoney(self, amount, receivers, edit_bag, title, content):
+    def giveMoney(self, amount, receivers, edit_bag, title, content, anonymous):
         self.progress.emit(0)
         idx = 0
         for id in receivers:
             self.ptt_bot.log('準備發錢給' + id)
             try:
-                self.pttErrCode = self.ptt_bot.give_money(id, int(amount), title, content)
+                self.pttErrCode = self.ptt_bot.give_money(id, int(amount), title, content, anonymous)
                 self.ptt_bot.log('發錢給 ' + id + ' 成功')
                 self.msg.emit('發錢給 ' + id + ' 成功')
             except Exception as e:
@@ -305,6 +307,7 @@ class App(QMainWindow):
     def sendMoney(self):
         amount = self.widget.money_amount_input.text()
         edit_bag = self.widget.edit_red_bag_checkbox.isChecked()
+        anonymous_bag = self.widget.anonymous_red_bag_checkbox.isChecked()
         bag_title = self.widget.edit_red_bag_title_input.text()
         bag_content = self.widget.edit_red_bag_content_input.toPlainText().replace('\n', '\r\n')
 
@@ -319,7 +322,8 @@ class App(QMainWindow):
                 receivers=receivers,
                 edit_bag=edit_bag,
                 bag_title=bag_title,
-                bag_content=bag_content))
+                bag_content=bag_content,
+                anonymous=anonymous_bag))
         except Exception as e:
             self.statusBar().showMessage('發錢失敗, 不明原因')  
 
@@ -327,6 +331,7 @@ class App(QMainWindow):
         receivers_and_amount = self.widget.money_receivers_amount_input.toPlainText().split('\n')
         receivers_and_amount = list(filter(None, receivers_and_amount))
         edit_bag = self.widget.edit_red_bag_checkbox.isChecked()
+        anonymous_bag = self.widget.anonymous_red_bag_checkbox.isChecked()
         bag_title = self.widget.edit_red_bag_title_input.text()
         bag_content = self.widget.edit_red_bag_content_input.toPlainText().replace('\n', '\r\n')
         self.widget.progressbar.setMaximum(len(receivers_and_amount))
@@ -336,7 +341,8 @@ class App(QMainWindow):
                 receivers_and_amount=receivers_and_amount,
                 edit_bag=edit_bag,
                 bag_title=bag_title,
-                bag_content=bag_content))
+                bag_content=bag_content,
+                anonymous=anonymous_bag))
         except Exception as e:
             self.statusBar().showMessage('發錢失敗, 不明原因')  
 
@@ -482,12 +488,14 @@ class MainWidget(QWidget):
         edit_bag_group = QGroupBox('修改紅包袋')
         edit_bag_form = QFormLayout()
         self.edit_red_bag_checkbox = QCheckBox('是否修改紅包袋')
+        self.anonymous_red_bag_checkbox = QCheckBox('是否匿名(小天使功能)')
         self.edit_red_bag_title_label = QLabel('紅包袋標題')
         self.edit_red_bag_title_input = QLineEdit()
         self.edit_red_bag_content_label = QLabel('紅包袋內文')
         self.edit_red_bag_content_input = QTextEdit()
         
         edit_bag_form.addRow(self.edit_red_bag_checkbox)
+        edit_bag_form.addRow(self.anonymous_red_bag_checkbox)
         edit_bag_form.addRow(self.edit_red_bag_title_label, self.edit_red_bag_title_input)
         edit_bag_form.addRow(self.edit_red_bag_content_label, self.edit_red_bag_content_input)
 
